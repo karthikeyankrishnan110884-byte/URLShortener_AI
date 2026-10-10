@@ -1,4 +1,4 @@
-# Master Prompt — AI-Assisted URL Shortener (Interview Assignment 010)
+# Master Prompt — AI-Assisted URL Shortener 
 
 > Paste this into Claude Code / Windsurf / Copilot Chat at the start of the project. Then drive it phase by phase. Do not let the AI proceed past a GATE without your explicit "APPROVED".
 
