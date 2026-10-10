@@ -71,3 +71,9 @@ tests/UrlShortener.Tests/
   Integration/     full HTTP pipeline via WebApplicationFactory
 docs/              requirements, architecture, scenarios, risks, testing, AI log, summary
 ```
+For questions about this project or the AI-assisted engineering methodology demonstrated, please email karthikeyankrishnan110884@gmail.com screen shot of the loaded API in my localhost:
+http://localhost:5104/swagger/index.html
+<img width="1701" height="992" alt="image" src="https://github.com/user-attachments/assets/170c3f7b-4b5f-4b17-b13b-55de857dfe62" />
+<img width="1617" height="741" alt="image" src="https://github.com/user-attachments/assets/904447a5-8c49-42b9-86e0-f59932d61fdd" />
+
+
