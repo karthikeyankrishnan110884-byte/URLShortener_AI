@@ -1,8 +1,7 @@
 # URL Shortener API (.NET 8)
 
 REST Web API that creates short links, redirects them, and reports click analytics.
-Built for interview assignment *010 – AI-Proficient Software Engineer*, following the phased
-process in [`URL_Shortener_AI_Prompt.md`](../URL_Shortener_AI_Prompt.md).
+
 
 **Simple mode:** thread-safe in-memory storage behind `ILinkRepository`, so it runs with no database.
 Data resets on restart. Every component is wired through dependency injection against an interface,
