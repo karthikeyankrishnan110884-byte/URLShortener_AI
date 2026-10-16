@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Quality gates (format, build, tests + coverage >= 85%, vulnerable packages)
+        run: ./scripts/quality-gates.sh
+
+      - name: Smoke load test (redirect p95 budget, zero lost click events)
+        run: |
+          ASPNETCORE_URLS=http://localhost:5199 Shortener__BaseUrl=http://localhost:5199 \
+          RateLimiting__RedirectPermitLimit=0 RateLimiting__CreatePermitLimit=100000 \
+            dotnet src/UrlShortener.Api/bin/Release/net8.0/UrlShortener.Api.dll --contentRoot "$PWD/src/UrlShortener.Api/bin/Release/net8.0" &
+          for i in $(seq 1 50); do curl -sf http://localhost:5199/healthz && break; sleep 0.2; done
+          dotnet tests/UrlShortener.LoadTests/bin/Release/net8.0/UrlShortener.LoadTests.dll \
+            --base-url http://localhost:5199 --duration 10 --concurrency 32 --label ci --p95-budget-ms 50
+
+      - name: Upload test results and coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/coverage

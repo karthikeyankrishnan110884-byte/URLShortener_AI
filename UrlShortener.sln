@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{BCA7EA5F
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UrlShortener.Tests", "tests\UrlShortener.Tests\UrlShortener.Tests.csproj", "{8D260C28-401D-4551-A68D-C30795438C97}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UrlShortener.LoadTests", "tests\UrlShortener.LoadTests\UrlShortener.LoadTests.csproj", "{43095B0B-38EF-4137-9E40-4893B7B30300}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,9 +30,14 @@ Global
 		{8D260C28-401D-4551-A68D-C30795438C97}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8D260C28-401D-4551-A68D-C30795438C97}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8D260C28-401D-4551-A68D-C30795438C97}.Release|Any CPU.Build.0 = Release|Any CPU
+		{43095B0B-38EF-4137-9E40-4893B7B30300}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{43095B0B-38EF-4137-9E40-4893B7B30300}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{43095B0B-38EF-4137-9E40-4893B7B30300}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{43095B0B-38EF-4137-9E40-4893B7B30300}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{3455C437-50EE-4FFC-BDB6-77AFA115CF5D} = {5915636B-9C69-4A5D-B3E9-F04FDD691370}
 		{8D260C28-401D-4551-A68D-C30795438C97} = {BCA7EA5F-7754-425D-9854-F28FF0D3C076}
+		{43095B0B-38EF-4137-9E40-4893B7B30300} = {BCA7EA5F-7754-425D-9854-F28FF0D3C076}
 	EndGlobalSection
 EndGlobal

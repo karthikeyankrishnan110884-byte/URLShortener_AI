@@ -1,42 +1,60 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using UrlShortener.Api.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers(o => o.Filters.Add<DomainExceptionFilter>());
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(o =>
+    o.CustomizeProblemDetails = c => c.ProblemDetails.Extensions["requestId"] = c.HttpContext.TraceIdentifier);
 builder.Services.AddUrlShortener(builder.Configuration);
-builder.Services.AddCreateLinkRateLimiting();
-builder.Services.AddHealthChecks();
+builder.Services.AddShortenerRateLimiting();
+builder.Services.AddTrustedForwardedHeaders(builder.Configuration);
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+var swaggerEnabled = builder.Configuration.GetValue("Swagger:Enabled", builder.Environment.IsDevelopment());
+if (swaggerEnabled)
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen(c =>
     {
-        Title = "URL Shortener API",
-        Version = "v1",
-        Description = "Create short links, redirect, and read click analytics.",
+        c.SwaggerDoc("v1", new OpenApiInfo
+        {
+            Title = "URL Shortener API",
+            Version = "v1",
+            Description = "Create short links, redirect, and read click analytics.",
+        });
+        var xml = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
+        if (File.Exists(xml))
+        {
+            c.IncludeXmlComments(xml);
+        }
     });
-    var xml = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
-    if (File.Exists(xml))
-    {
-        c.IncludeXmlComments(xml);
-    }
-});
+}
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
+app.UseMiddleware<RequestContextMiddleware>();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-// Swagger is enabled in all environments for the prototype; restrict to Development in production.
-app.UseSwagger();
-app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "URL Shortener API v1"));
+// Swagger is on in Development by default; elsewhere only when Swagger:Enabled=true.
+if (swaggerEnabled)
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "URL Shortener API v1"));
+}
 
 app.UseRateLimiter();
-app.MapHealthChecks("/health");
+
+// Liveness: the process is up (no dependency checks, so a slow dependency never triggers a restart loop).
+app.MapHealthChecks("/healthz", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false }); // backward-compatible alias
+
+// Readiness: dependencies tagged "ready" (click queue headroom). Degraded still returns 200; Unhealthy returns 503.
+app.MapHealthChecks("/readyz", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
+
 app.MapControllers();
 
 app.Run();

@@ -4,29 +4,26 @@ using UrlShortener.Api.Domain;
 namespace UrlShortener.Api.Repositories;
 
 /// <summary>
-/// Thread-safe in-memory store ("simple mode"). Codes are case-sensitive.
+/// Thread-safe in-memory link store ("simple mode"). Codes are case-sensitive.
 /// Data is lost on restart; acceptable for the prototype, see docs/RISKS.md.
 /// </summary>
 public sealed class InMemoryLinkRepository : ILinkRepository
 {
     private readonly ConcurrentDictionary<string, ShortLink> _links = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<ClickEvent>> _clicks = new(StringComparer.Ordinal);
 
-    public bool TryAdd(ShortLink link)
+    public ValueTask<bool> TryAddAsync(ShortLink link, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(link);
-        return _links.TryAdd(link.Code, link);
+        return ValueTask.FromResult(_links.TryAdd(link.Code, link));
     }
 
-    public ShortLink? GetByCode(string code) =>
-        _links.TryGetValue(code, out var link) ? link : null;
+    public ValueTask<ShortLink?> GetByCodeAsync(string code, CancellationToken cancellationToken = default) =>
+        ValueTask.FromResult(_links.TryGetValue(code, out var link) ? link : null);
 
-    public void AddClick(ClickEvent click)
+    public ValueTask UpdateAsync(ShortLink link, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(click);
-        _clicks.GetOrAdd(click.Code, _ => new ConcurrentQueue<ClickEvent>()).Enqueue(click);
+        ArgumentNullException.ThrowIfNull(link);
+        _links[link.Code] = link;
+        return ValueTask.CompletedTask;
     }
-
-    public IReadOnlyList<ClickEvent> GetClicks(string code) =>
-        _clicks.TryGetValue(code, out var queue) ? queue.ToArray() : [];
 }

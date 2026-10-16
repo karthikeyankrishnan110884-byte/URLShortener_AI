@@ -14,6 +14,6 @@ public sealed class CreateLinkRequest
     /// <example>dotnet8</example>
     public string? CustomAlias { get; init; }
 
-    /// <summary>Optional UTC expiry. Must be in the future.</summary>
+    /// <summary>Optional UTC expiry. Must be in the future and within <c>Shortener:MaxExpiryDays</c>.</summary>
     public DateTimeOffset? ExpiresAt { get; init; }
 }

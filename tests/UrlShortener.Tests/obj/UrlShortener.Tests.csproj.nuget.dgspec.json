@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\tests\\UrlShortener.Tests\\UrlShortener.Tests.csproj": {}
+    "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\tests\\UrlShortener.Tests\\UrlShortener.Tests.csproj": {}
   },
   "projects": {
-    "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\src\\UrlShortener.Api\\UrlShortener.Api.csproj": {
+    "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\src\\UrlShortener.Api\\UrlShortener.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\src\\UrlShortener.Api\\UrlShortener.Api.csproj",
+        "projectUniqueName": "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\src\\UrlShortener.Api\\UrlShortener.Api.csproj",
         "projectName": "UrlShortener.Api",
-        "projectPath": "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\src\\UrlShortener.Api\\UrlShortener.Api.csproj",
+        "projectPath": "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\src\\UrlShortener.Api\\UrlShortener.Api.csproj",
         "packagesPath": "C:\\Users\\karth\\.nuget\\packages\\",
-        "outputPath": "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\src\\UrlShortener.Api\\obj\\",
+        "outputPath": "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\src\\UrlShortener.Api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -99,14 +99,14 @@
         }
       }
     },
-    "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\tests\\UrlShortener.Tests\\UrlShortener.Tests.csproj": {
+    "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\tests\\UrlShortener.Tests\\UrlShortener.Tests.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\tests\\UrlShortener.Tests\\UrlShortener.Tests.csproj",
+        "projectUniqueName": "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\tests\\UrlShortener.Tests\\UrlShortener.Tests.csproj",
         "projectName": "UrlShortener.Tests",
-        "projectPath": "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\tests\\UrlShortener.Tests\\UrlShortener.Tests.csproj",
+        "projectPath": "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\tests\\UrlShortener.Tests\\UrlShortener.Tests.csproj",
         "packagesPath": "C:\\Users\\karth\\.nuget\\packages\\",
-        "outputPath": "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\tests\\UrlShortener.Tests\\obj\\",
+        "outputPath": "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\tests\\UrlShortener.Tests\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -128,8 +128,8 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\src\\UrlShortener.Api\\UrlShortener.Api.csproj": {
-                "projectPath": "C:\\Karthik\\Official\\Projects\\URL Shortener\\UrlShortener\\src\\UrlShortener.Api\\UrlShortener.Api.csproj"
+              "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\src\\UrlShortener.Api\\UrlShortener.Api.csproj": {
+                "projectPath": "C:\\Karthik\\Official\\Projects\\URLShortener_AI\\src\\UrlShortener.Api\\UrlShortener.Api.csproj"
               }
             }
           }

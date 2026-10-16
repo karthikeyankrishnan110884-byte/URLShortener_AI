@@ -43,7 +43,9 @@ public class LinksApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal("https://example.com/e2e", redirect.Headers.Location!.ToString());
         Assert.True(redirect.Headers.CacheControl!.NoStore);
 
-        var stats = await _client.GetFromJsonAsync<LinkStatsResponse>($"/api/v1/links/{link.Code}/stats");
+        var stats = await Eventually.GetAsync(
+            () => _client.GetFromJsonAsync<LinkStatsResponse>($"/api/v1/links/{link.Code}/stats")!,
+            s => s!.TotalClicks == 1);
         Assert.Equal(1, stats!.TotalClicks);
         Assert.Equal("news.ycombinator.com", Assert.Single(stats.TopReferrers).Referrer);
     }
@@ -55,7 +57,9 @@ public class LinksApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         await _client.GetAsync($"/{link.Code}");
         await _client.GetAsync($"/{link.Code}");
 
-        var fetched = await _client.GetFromJsonAsync<LinkResponse>($"/api/v1/links/{link.Code}");
+        var fetched = await Eventually.GetAsync(
+            () => _client.GetFromJsonAsync<LinkResponse>($"/api/v1/links/{link.Code}")!,
+            l => l!.ClickCount == 2);
 
         Assert.Equal(2, fetched!.ClickCount);
     }
@@ -136,9 +140,14 @@ public class LinksApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task Health_And_SwaggerDocument_AreServed()
     {
         var health = await _client.GetAsync("/health");
+        var healthz = await _client.GetAsync("/healthz");
+        var readyz = await _client.GetAsync("/readyz");
         var swagger = await _client.GetStringAsync("/swagger/v1/swagger.json");
 
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, healthz.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, readyz.StatusCode);
+        Assert.Contains("/stats/daily", swagger);
         Assert.Contains("/api/v1/links", swagger);
         Assert.Contains("/{code}", swagger);
     }

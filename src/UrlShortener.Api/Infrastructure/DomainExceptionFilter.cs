@@ -29,8 +29,12 @@ public sealed class DomainExceptionFilter(ProblemDetailsFactory problemDetailsFa
 
     internal static (int Status, string Title) MapStatus(DomainException exception) => exception switch
     {
-        InvalidUrlException or InvalidAliasException or InvalidExpiryException => (StatusCodes.Status400BadRequest, "Invalid request"),
+        InvalidUrlException or InvalidAliasException or InvalidExpiryException or InvalidQueryException
+            => (StatusCodes.Status400BadRequest, "Invalid request"),
+        UnsafeDestinationException => (StatusCodes.Status400BadRequest, "Destination not allowed"),
         AliasConflictException => (StatusCodes.Status409Conflict, "Alias already in use"),
+        IdempotencyKeyInProgressException => (StatusCodes.Status409Conflict, "Request in progress"),
+        IdempotencyKeyMismatchException => (StatusCodes.Status422UnprocessableEntity, "Idempotency-Key reused"),
         LinkNotFoundException => (StatusCodes.Status404NotFound, "Link not found"),
         LinkGoneException => (StatusCodes.Status410Gone, "Link no longer available"),
         CodeGenerationException => (StatusCodes.Status503ServiceUnavailable, "Could not allocate a short code"),

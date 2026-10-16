@@ -1,101 +1,129 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using UrlShortener.Api.Contracts;
 using UrlShortener.Api.Domain;
-using UrlShortener.Api.Infrastructure;
-using UrlShortener.Api.Repositories;
 using UrlShortener.Api.Services;
+using UrlShortener.Api.Services.Analytics;
 using UrlShortener.Tests.TestDoubles;
 
 namespace UrlShortener.Tests.Unit;
 
 public class UrlShortenerServiceTests
 {
-    private static readonly DateTimeOffset Start = new(2026, 10, 10, 9, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Start = ServiceHarness.Start;
 
-    private readonly InMemoryLinkRepository _repository = new();
-    private readonly FakeTimeProvider _clock = new(Start);
-    private readonly ShortenerOptions _options = new() { CodeLength = 7, MaxCodeGenerationAttempts = 3 };
+    private readonly ServiceHarness _h = new();
 
-    private UrlShortenerService CreateSut(IShortCodeGenerator? generator = null) => new(
-        _repository,
-        generator ?? new RandomShortCodeGenerator(),
-        new UrlValidator(Options.Create(_options)),
-        _clock,
-        Options.Create(_options),
-        NullLogger<UrlShortenerService>.Instance);
+    private UrlShortenerService CreateSut(IShortCodeGenerator? generator = null) => _h.CreateService(generator);
+
+    private static CreateLinkRequest Req(string url, string? alias = null, DateTimeOffset? expiresAt = null) =>
+        new() { Url = url, CustomAlias = alias, ExpiresAt = expiresAt };
+
+    private async Task<ShortLink> CreateAsync(UrlShortenerService sut, string url, string? alias = null, DateTimeOffset? expiresAt = null) =>
+        (await sut.CreateAsync(Req(url, alias, expiresAt))).Link;
 
     // ---------- Create ----------
 
     [Fact]
-    public void Create_WithValidUrl_StoresActiveLinkWithGeneratedCode()
+    public async Task Create_WithValidUrl_StoresActiveLinkWithGeneratedCode()
     {
-        var sut = CreateSut();
-
-        var link = sut.Create(new CreateLinkRequest { Url = "https://example.com/docs" });
+        var link = await CreateAsync(CreateSut(), "https://example.com/docs");
 
         Assert.Equal(7, link.Code.Length);
         Assert.Equal("https://example.com/docs", link.OriginalUrl.AbsoluteUri);
         Assert.Equal(Start, link.CreatedAt);
         Assert.True(link.IsActive);
         Assert.False(link.IsCustomAlias);
-        Assert.Same(link, _repository.GetByCode(link.Code));
+        Assert.Same(link, await _h.Links.GetByCodeAsync(link.Code));
     }
 
     [Fact]
-    public void Create_SameUrlTwice_ProducesTwoIndependentLinks()
+    public async Task Create_SameUrlTwice_ProducesTwoIndependentLinks()
     {
         // Decision: no de-duplication, so each creator gets separate analytics and lifecycle.
         var sut = CreateSut();
 
-        var first = sut.Create(new CreateLinkRequest { Url = "https://example.com" });
-        var second = sut.Create(new CreateLinkRequest { Url = "https://example.com" });
+        var first = await CreateAsync(sut, "https://example.com");
+        var second = await CreateAsync(sut, "https://example.com");
 
         Assert.NotEqual(first.Code, second.Code);
     }
 
     [Fact]
-    public void Create_WhenGeneratedCodeCollides_RetriesAndSucceeds()
+    public async Task Create_WhenGeneratedCodeCollides_RetriesAndSucceeds()
     {
-        _repository.TryAdd(new ShortLink("TAKEN01", new Uri("https://existing.example"), Start, null, false));
+        await _h.Links.TryAddAsync(new ShortLink("TAKEN01", new Uri("https://existing.example"), Start, null, false));
         var generator = new SequenceCodeGenerator("TAKEN01", "TAKEN01", "FRESH01");
-        var sut = CreateSut(generator);
 
-        var link = sut.Create(new CreateLinkRequest { Url = "https://new.example" });
+        var link = await CreateAsync(CreateSut(generator), "https://new.example");
 
         Assert.Equal("FRESH01", link.Code);
         Assert.Equal(3, generator.Calls);
-        Assert.Equal("https://existing.example/", _repository.GetByCode("TAKEN01")!.OriginalUrl.AbsoluteUri);
+        Assert.Equal("https://existing.example/", (await _h.Links.GetByCodeAsync("TAKEN01"))!.OriginalUrl.AbsoluteUri);
     }
 
     [Fact]
-    public void Create_WhenEveryAttemptCollides_FailsAfterConfiguredAttempts()
+    public async Task Create_WhenEveryAttemptCollides_FailsAfterConfiguredAttempts()
     {
-        _repository.TryAdd(new ShortLink("TAKEN01", new Uri("https://existing.example"), Start, null, false));
+        await _h.Links.TryAddAsync(new ShortLink("TAKEN01", new Uri("https://existing.example"), Start, null, false));
         var generator = new SequenceCodeGenerator("TAKEN01");
+
+        await Assert.ThrowsAsync<CodeGenerationException>(() => CreateAsync(CreateSut(generator), "https://new.example"));
+        Assert.Equal(_h.Options.MaxCodeGenerationAttempts, generator.Calls);
+    }
+
+    [Fact]
+    public async Task Create_NeverIssuesAGeneratedCodeThatIsAReservedWord()
+    {
+        var generator = new SequenceCodeGenerator("swagger", "healthz", "GOOD123");
+
+        var link = await CreateAsync(CreateSut(generator), "https://example.com");
+
+        Assert.Equal("GOOD123", link.Code);
+    }
+
+    [Fact]
+    public async Task Create_ConcurrentRequestsWithScriptedCollisions_AllGetDistinctCodes()
+    {
+        // Brownfield bug reproduction: many creates racing on the same candidate code must never share it.
+        var generator = new SharedCandidateGenerator();
         var sut = CreateSut(generator);
 
-        Assert.Throws<CodeGenerationException>(() => sut.Create(new CreateLinkRequest { Url = "https://new.example" }));
-        Assert.Equal(_options.MaxCodeGenerationAttempts, generator.Calls);
+        var links = await Task.WhenAll(Enumerable.Range(0, 50).Select(i =>
+            Task.Run(async () =>
+            {
+                try
+                {
+                    return (await sut.CreateAsync(Req($"https://site{i}.example"))).Link;
+                }
+                catch (CodeGenerationException)
+                {
+                    return null;
+                }
+            })));
+
+        var created = links.Where(l => l is not null).ToList();
+        Assert.Equal(created.Count, created.Select(l => l!.Code).Distinct().Count());
+        foreach (var link in created)
+        {
+            Assert.Same(link, await _h.Links.GetByCodeAsync(link!.Code));
+        }
     }
 
     [Fact]
-    public void Create_WithCustomAlias_UsesAliasAsCode()
+    public async Task Create_WithCustomAlias_UsesAliasAsCode()
     {
-        var link = CreateSut().Create(new CreateLinkRequest { Url = "https://example.com", CustomAlias = " promo-2026 " });
+        var link = await CreateAsync(CreateSut(), "https://example.com", " promo-2026 ");
 
         Assert.Equal("promo-2026", link.Code);
         Assert.True(link.IsCustomAlias);
     }
 
     [Fact]
-    public void Create_WithAliasAlreadyInUse_ThrowsConflict()
+    public async Task Create_WithAliasAlreadyInUse_ThrowsConflict()
     {
         var sut = CreateSut();
-        sut.Create(new CreateLinkRequest { Url = "https://a.example", CustomAlias = "sale" });
+        await CreateAsync(sut, "https://a.example", "sale");
 
-        Assert.Throws<AliasConflictException>(() =>
-            sut.Create(new CreateLinkRequest { Url = "https://b.example", CustomAlias = "sale" }));
+        await Assert.ThrowsAsync<AliasConflictException>(() => CreateAsync(sut, "https://b.example", "sale"));
     }
 
     [Theory]
@@ -104,143 +132,209 @@ public class UrlShortenerServiceTests
     [InlineData("emoji😀")]
     [InlineData("slash/path")]
     [InlineData("this-alias-is-way-too-long-to-be-accepted")]
-    public void Create_WithMalformedAlias_ThrowsInvalidAlias(string alias)
+    public async Task Create_WithMalformedAlias_ThrowsInvalidAlias(string alias)
     {
-        Assert.Throws<InvalidAliasException>(() =>
-            CreateSut().Create(new CreateLinkRequest { Url = "https://example.com", CustomAlias = alias }));
+        await Assert.ThrowsAsync<InvalidAliasException>(() => CreateAsync(CreateSut(), "https://example.com", alias));
     }
 
     [Theory]
     [InlineData("api")]
     [InlineData("Swagger")]
     [InlineData("HEALTH")]
-    public void Create_WithReservedAlias_IsRejected_SoRoutesCannotBeHijacked(string alias)
+    [InlineData("readyz")]
+    public async Task Create_WithReservedAlias_IsRejected_SoRoutesCannotBeHijacked(string alias)
     {
-        var ex = Assert.Throws<InvalidAliasException>(() =>
-            CreateSut().Create(new CreateLinkRequest { Url = "https://example.com", CustomAlias = alias }));
+        var ex = await Assert.ThrowsAsync<InvalidAliasException>(() => CreateAsync(CreateSut(), "https://example.com", alias));
 
         Assert.Contains("reserved", ex.Message);
     }
 
     [Fact]
-    public void Create_WithExpiryInThePast_IsRejected()
+    public async Task Create_WithExpiryInThePast_IsRejected()
     {
-        Assert.Throws<InvalidExpiryException>(() =>
-            CreateSut().Create(new CreateLinkRequest { Url = "https://example.com", ExpiresAt = Start.AddMinutes(-1) }));
+        await Assert.ThrowsAsync<InvalidExpiryException>(() =>
+            CreateAsync(CreateSut(), "https://example.com", expiresAt: Start.AddMinutes(-1)));
     }
 
     [Fact]
-    public void Create_WithUnsafeUrl_DoesNotStoreAnything()
+    public async Task Create_WithExpiryBeyondMaximum_IsRejected()
     {
-        Assert.Throws<InvalidUrlException>(() =>
-            CreateSut().Create(new CreateLinkRequest { Url = "http://169.254.169.254/", CustomAlias = "meta" }));
+        var ex = await Assert.ThrowsAsync<InvalidExpiryException>(() =>
+            CreateAsync(CreateSut(), "https://example.com", expiresAt: Start.AddDays(31)));
 
-        Assert.Null(_repository.GetByCode("meta"));
+        Assert.Contains("30 days", ex.Message);
+    }
+
+    [Fact]
+    public async Task Create_WithUnsafeUrl_DoesNotStoreAnything()
+    {
+        await Assert.ThrowsAsync<InvalidUrlException>(() => CreateAsync(CreateSut(), "http://169.254.169.254/", "meta"));
+
+        Assert.Null(await _h.Links.GetByCodeAsync("meta"));
+    }
+
+    [Fact]
+    public async Task Create_ToDenylistedDomainOrSubdomain_IsRejected()
+    {
+        _h.Safety.BlockedDomains.Add("evil.test");
+        var sut = CreateSut();
+
+        await Assert.ThrowsAsync<UnsafeDestinationException>(() => CreateAsync(sut, "https://login.EVIL.test/reset"));
+        await Assert.ThrowsAsync<UnsafeDestinationException>(() => CreateAsync(sut, "https://evil.test/"));
+        Assert.NotNull(await CreateAsync(sut, "https://notevil.test/"));
+    }
+
+    // ---------- Idempotency ----------
+
+    [Fact]
+    public async Task Create_WithSameIdempotencyKeyAndBody_ReturnsOriginalLink()
+    {
+        var sut = CreateSut();
+
+        var first = await sut.CreateAsync(Req("https://example.com/a"), "key-1");
+        var retry = await sut.CreateAsync(Req(" https://example.com/a "), "key-1");
+
+        Assert.False(first.Replayed);
+        Assert.True(retry.Replayed);
+        Assert.Same(first.Link, retry.Link);
+    }
+
+    [Fact]
+    public async Task Create_WithSameIdempotencyKeyButDifferentBody_IsRejected()
+    {
+        var sut = CreateSut();
+        await sut.CreateAsync(Req("https://example.com/a"), "key-2");
+
+        await Assert.ThrowsAsync<IdempotencyKeyMismatchException>(() => sut.CreateAsync(Req("https://example.com/b"), "key-2"));
+    }
+
+    [Fact]
+    public async Task Create_FailedRequest_ReleasesIdempotencyKey_SoClientCanRetry()
+    {
+        var sut = CreateSut();
+        await CreateAsync(sut, "https://a.example", "taken");
+
+        await Assert.ThrowsAsync<AliasConflictException>(() => sut.CreateAsync(Req("https://b.example", "taken"), "key-3"));
+        await Assert.ThrowsAsync<AliasConflictException>(() => sut.CreateAsync(Req("https://b.example", "taken"), "key-3"));
     }
 
     // ---------- Resolve ----------
 
     [Fact]
-    public void ResolveAndTrack_ReturnsTargetAndRecordsClick()
+    public async Task Resolve_ReturnsTargetAndRecordsClick()
     {
         var sut = CreateSut();
-        var link = sut.Create(new CreateLinkRequest { Url = "https://example.com/landing" });
+        var link = await CreateAsync(sut, "https://example.com/landing");
 
-        var target = sut.ResolveAndTrack(link.Code, "https://www.LinkedIn.com/feed/", "Mozilla/5.0");
+        var target = await sut.ResolveAsync(link.Code, new ClickContext("https://www.LinkedIn.com/feed/", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile", "LinkedIn", "Social", "Launch"));
 
         Assert.Equal("https://example.com/landing", target.AbsoluteUri);
         Assert.Equal(1, link.ClickCount);
-        var click = Assert.Single(_repository.GetClicks(link.Code));
+        var click = Assert.Single(await _h.Clicks.GetRecentAsync(link.Code));
         Assert.Equal("www.linkedin.com", click.ReferrerHost);
-        Assert.Equal("Mozilla/5.0", click.UserAgent);
+        Assert.Equal(UserAgentClassifier.Mobile, click.Device);
+        Assert.Equal(new UtmTags("linkedin", "social", "launch"), click.Utm);
     }
 
     [Fact]
-    public void ResolveAndTrack_UnknownCode_ThrowsNotFound()
+    public async Task Resolve_UnknownCode_ThrowsNotFound()
     {
-        Assert.Throws<LinkNotFoundException>(() => CreateSut().ResolveAndTrack("nope123", null, null));
+        await Assert.ThrowsAsync<LinkNotFoundException>(() => CreateSut().ResolveAsync("nope123", ClickContext.Empty));
     }
 
     [Fact]
-    public void ResolveAndTrack_AfterExpiry_ThrowsGone_AndDoesNotCountClick()
+    public async Task Resolve_AfterExpiry_ThrowsGone_AndDoesNotCountClick()
     {
         var sut = CreateSut();
-        var link = sut.Create(new CreateLinkRequest { Url = "https://example.com", ExpiresAt = Start.AddHours(1) });
+        var link = await CreateAsync(sut, "https://example.com", expiresAt: Start.AddHours(1));
 
-        _clock.Advance(TimeSpan.FromHours(1));
+        _h.Clock.Advance(TimeSpan.FromHours(1));
 
-        var ex = Assert.Throws<LinkGoneException>(() => sut.ResolveAndTrack(link.Code, null, null));
+        var ex = await Assert.ThrowsAsync<LinkGoneException>(() => sut.ResolveAsync(link.Code, ClickContext.Empty));
         Assert.Contains("expired", ex.Message);
         Assert.Equal(0, link.ClickCount);
     }
 
     [Fact]
-    public void ResolveAndTrack_AfterDeactivation_ThrowsGone()
+    public async Task Resolve_AfterDeactivation_ThrowsGone()
     {
         var sut = CreateSut();
-        var link = sut.Create(new CreateLinkRequest { Url = "https://example.com" });
+        var link = await CreateAsync(sut, "https://example.com");
 
-        sut.Deactivate(link.Code);
+        await sut.DeactivateAsync(link.Code);
 
-        var ex = Assert.Throws<LinkGoneException>(() => sut.ResolveAndTrack(link.Code, null, null));
+        var ex = await Assert.ThrowsAsync<LinkGoneException>(() => sut.ResolveAsync(link.Code, ClickContext.Empty));
         Assert.Contains("deactivated", ex.Message);
     }
 
     [Fact]
-    public void ResolveAndTrack_TruncatesOversizedUserAgent_AndIgnoresInvalidReferrer()
+    public async Task Resolve_WhenDomainIsDenylistedAfterCreation_StopsRedirecting()
     {
         var sut = CreateSut();
-        var link = sut.Create(new CreateLinkRequest { Url = "https://example.com" });
+        var link = await CreateAsync(sut, "https://later-bad.test/promo");
 
-        sut.ResolveAndTrack(link.Code, "not a url", new string('x', 5_000));
+        _h.Safety.BlockedDomains.Add("later-bad.test");
+        var refreshed = CreateSut(); // screen reads options at construction; the real app uses IOptionsMonitor reloads
 
-        var click = Assert.Single(_repository.GetClicks(link.Code));
+        var ex = await Assert.ThrowsAsync<LinkGoneException>(() => refreshed.ResolveAsync(link.Code, ClickContext.Empty));
+        Assert.Contains("blocked", ex.Message);
+        Assert.Equal(0, link.ClickCount);
+    }
+
+    [Fact]
+    public async Task Peek_ReturnsTarget_WithoutCountingAClick()
+    {
+        var sut = CreateSut();
+        var link = await CreateAsync(sut, "https://example.com/peek");
+
+        var target = await sut.PeekAsync(link.Code);
+
+        Assert.Equal("https://example.com/peek", target.AbsoluteUri);
+        Assert.Equal(0, link.ClickCount);
+    }
+
+    [Fact]
+    public async Task Resolve_TruncatesOversizedUserAgent_AndIgnoresInvalidReferrerAndTags()
+    {
+        var sut = CreateSut();
+        var link = await CreateAsync(sut, "https://example.com");
+
+        await sut.ResolveAsync(link.Code, new ClickContext("not a url", new string('x', 5_000), "<script>", null, null));
+
+        var click = Assert.Single(await _h.Clicks.GetRecentAsync(link.Code));
         Assert.Null(click.ReferrerHost);
         Assert.Equal(256, click.UserAgent!.Length);
+        Assert.Null(click.Utm);
     }
 
-    // ---------- Stats & lifecycle ----------
+    // ---------- Lifecycle ----------
 
     [Fact]
-    public void GetStats_AggregatesClicksByDayAndTopReferrers()
+    public async Task Deactivate_IsIdempotent()
     {
         var sut = CreateSut();
-        var link = sut.Create(new CreateLinkRequest { Url = "https://example.com" });
+        var link = await CreateAsync(sut, "https://example.com");
 
-        sut.ResolveAndTrack(link.Code, "https://google.com/search", null);
-        sut.ResolveAndTrack(link.Code, "https://google.com/other", null);
-        sut.ResolveAndTrack(link.Code, null, null);
-        _clock.Advance(TimeSpan.FromDays(1));
-        sut.ResolveAndTrack(link.Code, "https://twitter.com/x", null);
+        await sut.DeactivateAsync(link.Code);
+        _h.Clock.Advance(TimeSpan.FromHours(1));
+        await sut.DeactivateAsync(link.Code);
 
-        var stats = sut.GetStats(link.Code);
-
-        Assert.Equal(4, stats.TotalClicks);
-        Assert.Equal(Start.AddDays(1), stats.LastAccessedAt);
-        Assert.Equal(
-            new[] { new DailyClicks(new DateOnly(2026, 10, 10), 3), new DailyClicks(new DateOnly(2026, 10, 11), 1) },
-            stats.ClicksByDay);
-        Assert.Equal(new ReferrerClicks("google.com", 2), stats.TopReferrers[0]);
-        Assert.Contains(new ReferrerClicks("(direct)", 1), stats.TopReferrers);
+        Assert.Equal(Start, link.DeactivatedAt);
     }
 
     [Fact]
-    public void GetStats_ForNewLink_IsEmptyNotNull()
+    public async Task Deactivate_UnknownCode_ThrowsNotFound()
     {
-        var sut = CreateSut();
-        var link = sut.Create(new CreateLinkRequest { Url = "https://example.com" });
-
-        var stats = sut.GetStats(link.Code);
-
-        Assert.Equal(0, stats.TotalClicks);
-        Assert.Null(stats.LastAccessedAt);
-        Assert.Empty(stats.ClicksByDay);
-        Assert.Empty(stats.TopReferrers);
+        await Assert.ThrowsAsync<LinkNotFoundException>(() => CreateSut().DeactivateAsync("missing"));
     }
 
-    [Fact]
-    public void Deactivate_UnknownCode_ThrowsNotFound()
+    /// <summary>Every caller first proposes the same code, then a unique one: maximises contention on one key.</summary>
+    private sealed class SharedCandidateGenerator : IShortCodeGenerator
     {
-        Assert.Throws<LinkNotFoundException>(() => CreateSut().Deactivate("missing"));
+        private readonly ThreadLocal<int> _calls = new(() => 0);
+        private int _unique;
+
+        public string Generate(int length) =>
+            _calls.Value++ % 2 == 0 ? "SAME000" : $"U{Interlocked.Increment(ref _unique):000000}";
     }
 }

@@ -2,15 +2,16 @@ using UrlShortener.Api.Domain;
 
 namespace UrlShortener.Api.Repositories;
 
-/// <summary>Storage abstraction. Swap the in-memory implementation for SQL/Redis without touching services.</summary>
+/// <summary>
+/// Link storage abstraction. Async so a SQL/Redis implementation can be swapped in without changing callers.
+/// </summary>
 public interface ILinkRepository
 {
-    /// <summary>Atomically adds the link. Returns false if the code already exists (uniqueness guarantee).</summary>
-    bool TryAdd(ShortLink link);
+    /// <summary>Atomically adds the link. Returns false if the code already exists (uniqueness guarantee; SQL: unique index).</summary>
+    ValueTask<bool> TryAddAsync(ShortLink link, CancellationToken cancellationToken = default);
 
-    ShortLink? GetByCode(string code);
+    ValueTask<ShortLink?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
 
-    void AddClick(ClickEvent click);
-
-    IReadOnlyList<ClickEvent> GetClicks(string code);
+    /// <summary>Persists a state change (e.g. deactivation). Decorators use this to invalidate caches.</summary>
+    ValueTask UpdateAsync(ShortLink link, CancellationToken cancellationToken = default);
 }

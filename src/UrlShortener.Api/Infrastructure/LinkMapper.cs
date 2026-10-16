@@ -12,5 +12,8 @@ public static class LinkMapper
         link.CreatedAt,
         link.ExpiresAt,
         link.IsActive,
-        link.ClickCount);
+        link.ClickCount,
+        link.IsCustomAlias,
+        link.DeactivatedAt,
+        link.LastAccessedAt);
 }

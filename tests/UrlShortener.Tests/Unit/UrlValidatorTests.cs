@@ -54,6 +54,23 @@ public class UrlValidatorTests
     [InlineData("http://[::1]/")]
     [InlineData("http://[fd00::1]/")]
     [InlineData("http://[::ffff:10.0.0.1]/")]
+    [InlineData("http://localhost./")]                  // trailing root dot
+    [InlineData("http://LOCALHOST/")]
+    [InlineData("http://[fe80::1%25eth0]/")]            // IPv6 link-local with zone id
+    [InlineData("http://2130706433/")]                  // decimal 127.0.0.1
+    [InlineData("http://0x7f000001/")]                  // hex 127.0.0.1
+    [InlineData("http://0177.0.0.1/")]                  // octal 127.0.0.1
+    [InlineData("http://127.1/")]                       // short form
+    [InlineData("http://100.64.0.1/")]                  // CGNAT
+    [InlineData("http://198.18.0.1/")]                  // benchmarking
+    [InlineData("http://224.0.0.1/")]                   // multicast
+    [InlineData("http://255.255.255.255/")]             // broadcast
+    [InlineData("http://[ff02::1]/")]                   // IPv6 multicast
+    [InlineData("http://[64:ff9b::a00:1]/")]            // NAT64 → 10.0.0.1
+    [InlineData("http://[2002:c0a8:101::1]/")]          // 6to4 → 192.168.1.1
+    [InlineData("http://intranet/")]                    // single-label host
+    [InlineData("http://router.home.arpa/")]
+    [InlineData("http://metadata.google.internal/")]
     public void Validate_RejectsLoopbackAndPrivateNetworkTargets(string url)
     {
         var ex = Assert.Throws<InvalidUrlException>(() => _sut.Validate(url));
@@ -64,6 +81,12 @@ public class UrlValidatorTests
     [Theory]
     [InlineData("http://172.15.0.1")]
     [InlineData("http://172.32.0.1")]
+    [InlineData("http://100.63.255.255")]
+    [InlineData("http://100.128.0.1")]
+    [InlineData("http://198.17.255.255")]
+    [InlineData("http://223.255.255.255")]
+    [InlineData("http://[2001:4860:4860::8888]/")]
+    [InlineData("http://[64:ff9b::808:808]/")]          // NAT64 → 8.8.8.8 (public)
     public void Validate_AllowsAddressesJustOutsidePrivateRanges(string url)
     {
         Assert.NotNull(_sut.Validate(url));
@@ -77,5 +100,24 @@ public class UrlValidatorTests
         var ex = Assert.Throws<InvalidUrlException>(() => _sut.Validate(url));
 
         Assert.Contains("at most 100", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_RejectsLinksToTheShortenerItself_ToPreventRedirectLoops()
+    {
+        var sut = new UrlValidator(Options.Create(new ShortenerOptions { BaseUrl = "https://sho.rt" }));
+
+        var ex = Assert.Throws<InvalidUrlException>(() => sut.Validate("https://SHO.RT./abc1234"));
+
+        Assert.Contains("redirect loop", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_RejectsImplicitFilePath_OnEveryOperatingSystem()
+    {
+        // Regression: on Linux, Uri.TryCreate("/relative/path", Absolute) succeeds as file:///relative/path.
+        var ex = Assert.Throws<InvalidUrlException>(() => _sut.Validate("/etc/passwd"));
+
+        Assert.Contains("absolute", ex.Message);
     }
 }
