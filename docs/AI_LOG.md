@@ -137,8 +137,13 @@ Environment: NuGet.org is blocked in the AI workspace, so packages were restored
 ### T15: Quality-gate automation + CI (D1) (2026-10-15)
 - Prompt intent: make rule 5 repeatable.
 - AI generated: `scripts/quality-gates.sh` (CI) and `.ps1` (Windows) + `quality.cmd`; `.github/workflows/ci.yml` (gates + load smoke with p95 budget + artifacts).
-- Edits: none. Rejected: a third-party coverage-threshold package: the scripts parse Cobertura directly.
-- Quality gates: script run end to end ✅.
+- Edits (revised after the first GitHub Actions runs): run 1 failed with exit 126 because committing from Windows dropped the
+  executable bit on `scripts/*.sh`. Fixed by invoking the script via `bash` and setting the mode in git. Run 2 passed all 212 tests,
+  then failed with exit 2: `grep … | head -1` under `set -o pipefail` raced (head closed the pipe, grep hit "Broken pipe").
+  Rewrote coverage parsing without pipes, and replaced `echo | grep -q` in the vulnerability gate, which had the same race and could
+  have hidden a finding. Also: actions v5 (Node 20 deprecation), runner pinned to ubuntu-24.04, build output removed from git.
+- Rejected: a third-party coverage-threshold package: the scripts parse Cobertura directly.
+- Quality gates: script run end to end ✅; negative test (gate forced to 99 %) fails as expected ✅.
 - Sign-off required: N.
 
 ### T16: Documentation (D2) (2026-10-15)
@@ -154,8 +159,8 @@ Environment: NuGet.org is blocked in the AI workspace, so packages were restored
 
 | Outcome | Entries | % | Entries |
 |---|---|---|---|
-| Accepted as generated | 9 | 53 % | T1, T5, T6, T7, T8, T9, T12, T15, T16 |
-| Revised (engineer direction, or AI after a failing gate/test) | 8 | 47 % | T0 (stack), T2, T3, T4, T10, T11, T13, T14 |
+| Accepted as generated | 8 | 47 % | T1, T5, T6, T7, T8, T9, T12, T16 |
+| Revised (engineer direction, or AI after a failing gate/test) | 9 | 53 % | T0 (stack), T2, T3, T4, T10, T11, T13, T14, T15 |
 | **Total deliverable entries** | **17** | 100 % | |
 
 | Rejected alternatives (with reason) | Count |
@@ -169,5 +174,6 @@ Environment: NuGet.org is blocked in the AI workspace, so packages were restored
 2. 98 % analytics event loss in the first async design: caught by the load test's lost-event check.
 3. A flaky bug reproduction (3/5): caught by repeated runs; made deterministic.
 4. Config not loaded when launched outside the content root: caught by the curl smoke test.
+5. A pipe race in the gate script that only appeared on GitHub's runner: caught by the first CI runs.
 
 Ownership: all code and decisions remain the engineer's. High-impact items (T0, T1, T2, T6, T8, T10, T13) were **signed off by Karthik on 2026-10-15**.

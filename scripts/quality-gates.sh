@@ -18,9 +18,13 @@ dotnet build --no-restore -c Release
 
 echo "=== 4/5 test + coverage ==="
 dotnet test --no-build -c Release --collect:"XPlat Code Coverage" --results-directory "$OUT" --logger "trx;LogFileName=results.trx"
-REPORT=$(find "$OUT" -name coverage.cobertura.xml | head -1)
-LINE=$(grep -o 'line-rate="[0-9.]*"' "$REPORT" | head -1 | grep -o '[0-9.]*')
-BRANCH=$(grep -o 'branch-rate="[0-9.]*"' "$REPORT" | head -1 | grep -o '[0-9.]*')
+# No "| head" pipelines here: under pipefail, head closing the pipe early makes grep fail with
+# "Broken pipe" (exit 2), which is timing-dependent and broke the first CI run.
+REPORT=$(find "$OUT" -name coverage.cobertura.xml -print -quit)
+[ -n "$REPORT" ] || { echo "FAIL: coverage report not found under $OUT"; exit 1; }
+ROOT=$(grep -m1 '<coverage ' "$REPORT")          # root element carries the totals
+LINE=${ROOT#*line-rate=\"};   LINE=${LINE%%\"*}
+BRANCH=${ROOT#*branch-rate=\"}; BRANCH=${BRANCH%%\"*}
 LINE_PCT=$(awk "BEGIN { printf \"%.1f\", $LINE * 100 }")
 BRANCH_PCT=$(awk "BEGIN { printf \"%.1f\", $BRANCH * 100 }")
 echo "Line coverage: ${LINE_PCT}%  Branch coverage: ${BRANCH_PCT}%  (gate: line >= ${MIN_COVERAGE}%)"
@@ -29,6 +33,6 @@ awk "BEGIN { exit !($LINE * 100 >= $MIN_COVERAGE) }" || { echo "FAIL: line cover
 echo "=== 5/5 vulnerable packages (needs nuget.org) ==="
 VULN=$(dotnet list package --vulnerable --include-transitive 2>&1)
 echo "$VULN"
-if echo "$VULN" | grep -q "has the following vulnerable packages"; then echo "FAIL: vulnerable packages found"; exit 1; fi
+if grep -q "has the following vulnerable packages" <<< "$VULN"; then echo "FAIL: vulnerable packages found"; exit 1; fi
 
 echo "All quality gates passed."
