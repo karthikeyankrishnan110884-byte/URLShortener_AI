@@ -119,6 +119,10 @@ docs/                          requirements, architecture, ADRs, tasks, scenario
 
 For questions about this project or the AI-assisted engineering methodology demonstrated, email karthikeyankrishnan110884@gmail.com.
 
-Screenshots of the API running locally (http://localhost:5104/swagger/index.html):
-<img width="1701" height="992" alt="Swagger UI" src="https://github.com/user-attachments/assets/170c3f7b-4b5f-4b17-b13b-55de857dfe62" />
-<img width="1617" height="741" alt="Swagger UI endpoints" src="https://github.com/user-attachments/assets/904447a5-8c49-42b9-86e0-f59932d61fdd" />
+Screenshots of the API running locally :
+
+<img width="1850" height="1076" alt="image" src="https://github.com/user-attachments/assets/cd88a05a-8e4a-47c5-a2d5-fd1fa526fb27" />
+<img width="1806" height="982" alt="image" src="https://github.com/user-attachments/assets/43db9754-dfc6-466f-b58b-378288ff3df2" />
+<img width="1805" height="997" alt="image" src="https://github.com/user-attachments/assets/d88373a8-7b95-4230-a9c3-53cf13bc3ae7" />
+
+
