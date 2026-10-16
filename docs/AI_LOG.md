@@ -56,7 +56,7 @@ Format per master prompt: Prompt intent · AI generated · Edits · Rejected · 
 ## Session 2: review against the assignment, brownfield, ambiguous scope, Phase 5 (2026-10-15)
 
 Engineer direction: *"review this code against the assessment, fix the code issues, fill in the gaps, improve."*
-Environment: NuGet.org is blocked in the AI workspace, so packages were restored offline from the engineer's local NuGet cache (read-only access granted for this). The vulnerable-package gate therefore needs a re-run online (see T16).
+Environment: NuGet.org is blocked in the AI workspace, so packages were restored offline from the engineer's local NuGet cache (read-only access granted for this). The vulnerable-package gate was then run on the engineer's machine against nuget.org: no vulnerable packages (see T16).
 
 ### T5: Review & scoring (2026-10-15)
 - Prompt intent: score the repo against the master prompt and the assignment PDF.
@@ -145,7 +145,7 @@ Environment: NuGet.org is blocked in the AI workspace, so packages were restored
 - Prompt intent: fill Phase 1-5 documentation gaps.
 - AI generated: `docs/DECISIONS/ADR-001…010`, `TASKS.md`, `SCENARIOS/A|B|C`, rewritten REQUIREMENTS (NFR targets, assumptions, G/W/T for every FR), ARCHITECTURE (control flow, caching, failure modes), RISKS (detection column), TESTING, FINAL_SUMMARY, README.
 - Edits: none. Rejected: none.
-- Quality gates (final): format ✅ · build 0 warnings ✅ · **212 tests passed** ✅ · **line 97.8 % / branch 94.2 %** ✅ · vulnerable packages: none against the local mirror. ⚠️ **Re-run `quality.cmd` online** to confirm against the live advisory feed.
+- Quality gates (final): format ✅ · build 0 warnings ✅ · **212 tests passed** ✅ · **line 97.8 % / branch 94.2 %** ✅ · vulnerable packages: **none**, confirmed against the live nuget.org feed on the engineer's machine (2026-10-15).
 - Sign-off required: Y. [x] docs reviewed, approved by Karthik (2026-10-15)
 
 ---

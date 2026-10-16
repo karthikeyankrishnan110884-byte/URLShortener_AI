@@ -46,10 +46,16 @@ and the defensive `_ =>` branch of the error mapping.
 === 3/5 build (Release, nullable on, TreatWarningsAsErrors) === Build succeeded. 0 Warning(s) 0 Error(s)
 === 4/5 test + coverage ===  Passed! Failed: 0, Passed: 212, Skipped: 0, Total: 212
 Line coverage: 97.8%  Branch coverage: 94.2%  (gate: line >= 85%)
-=== 5/5 vulnerable packages === no vulnerable packages (see note)
+=== 5/5 vulnerable packages === no vulnerable packages (see below)
 ```
-Note: the AI's workspace has no nuget.org access, so step 5 ran against a local package mirror. Re-run `quality.cmd` (or let CI run) to
-check against the live advisory feed.
+Vulnerable-package check against the live nuget.org advisory feed, run on the engineer's machine (2026-10-15):
+```
+> dotnet list package --vulnerable --include-transitive
+The following sources were used: https://api.nuget.org/v3/index.json
+The given project `UrlShortener.Api` has no vulnerable packages given the current sources.
+The given project `UrlShortener.Tests` has no vulnerable packages given the current sources.
+The given project `UrlShortener.LoadTests` has no vulnerable packages given the current sources.
+```
 
 ## Determinism
 The full suite was run repeatedly with no flakes. The collision reproduction uses a barrier rather than timing (it was flaky, 2/5, before that change).

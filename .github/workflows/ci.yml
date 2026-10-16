@@ -10,17 +10,17 @@ permissions:
 
 jobs:
   quality-gates:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
       - name: Quality gates (format, build, tests + coverage >= 85%, vulnerable packages)
-        run: ./scripts/quality-gates.sh
+        run: bash ./scripts/quality-gates.sh
 
       - name: Smoke load test (redirect p95 budget, zero lost click events)
         run: |
@@ -33,7 +33,7 @@ jobs:
 
       - name: Upload test results and coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-results
           path: artifacts/coverage
