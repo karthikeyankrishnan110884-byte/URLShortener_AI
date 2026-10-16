@@ -121,6 +121,7 @@ For questions about this project or the AI-assisted engineering methodology demo
 
 Screenshots of the API running locally :
 
+<img width="1681" height="658" alt="image" src="https://github.com/user-attachments/assets/4788c4b9-6d82-42a1-ab07-b4dd49d31add" />
 <img width="1850" height="1076" alt="image" src="https://github.com/user-attachments/assets/cd88a05a-8e4a-47c5-a2d5-fd1fa526fb27" />
 <img width="1806" height="982" alt="image" src="https://github.com/user-attachments/assets/43db9754-dfc6-466f-b58b-378288ff3df2" />
 <img width="1805" height="997" alt="image" src="https://github.com/user-attachments/assets/d88373a8-7b95-4230-a9c3-53cf13bc3ae7" />
